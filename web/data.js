@@ -18,6 +18,7 @@
     place_images: ['id', 'place_id', 'storage_path', 'file_size', 'created_at']
   };
   let databasePromise;
+  let sharedProfile = {names:"", firstDay:"", revision:0};
 
   function makeError(message, code = 'OUR_DATE_ERROR', status = 0) {
     const error = new Error(message);
@@ -41,6 +42,10 @@
     return settings.supabaseUrl && settings.publishableKey && settings.pairKey ? 'cloud' : 'local';
   }
   function getSettings() {
+    if (window.OUR_DATE_CONFIG?.passwordGate) {
+      const c = window.OUR_DATE_CONFIG;
+      return {mode:'cloud', supabaseUrl:c.supabaseUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, ''), publishableKey:c.publishableKey, kakaoKey:c.kakaoKey, pairKey:window.OurDateGate?.token || ''};
+    }
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); } catch (_) {}
     const config = Object.assign({}, window.OUR_DATE_CONFIG || {}, saved || {});
@@ -74,6 +79,7 @@
     cloudURLs.clear();
   }
   function saveSettings(input) {
+    if (window.OUR_DATE_CONFIG?.passwordGate) throw makeError('연결 정보는 앱 배포 설정에서 관리합니다.');
     const settings = Object.assign(getSettings(), input || {});
     for (const key of ['supabaseUrl', 'publishableKey', 'pairKey', 'kakaoKey']) settings[key] = String(settings[key] || '').trim();
     if (!['local', 'cloud'].includes(settings.mode)) throw makeError('저장 방식을 선택해 주세요.');
@@ -268,6 +274,7 @@
     return headers;
   }
   async function cloudRequest(settings, path, options = {}) {
+    if (window.OUR_DATE_CONFIG?.passwordGate && !settings.pairKey) throw makeError('먼저 비밀번호로 입장해 주세요.', 'SESSION_REQUIRED', 401);
     validateSettings(settings);
     if (!settings.supabaseUrl || !settings.publishableKey || !settings.pairKey) throw makeError('먼저 Supabase URL·공용 키·공유 코드를 모두 설정해 주세요.');
     const controller = new AbortController();
@@ -275,8 +282,11 @@
     let response;
     try {
       response = await fetch(`${settings.supabaseUrl.replace(/\/+$/, '')}${path}`, {
-        ...options, headers: requestHeaders(settings, options.headers), signal: controller.signal, cache: 'no-store'
+        ...options, headers: requestHeaders(settings, options.headers), signal: controller.signal, cache: 'no-store', redirect:'error'
       });
+      // Keep the deadline active while downloading the body, not only response headers.
+      const bytes = await response.arrayBuffer();
+      response = new Response(response.status === 204 ? null : bytes, {status:response.status, statusText:response.statusText, headers:response.headers});
     } catch (error) {
       throw makeError(error.name === 'AbortError' ? '서버 응답 시간이 초과되었습니다. 저장 결과를 새로고침으로 확인한 뒤 다시 시도해 주세요.' : '클라우드에 연결할 수 없습니다. 인터넷 연결과 서버 설정을 확인해 주세요. 저장되지 않은 변경은 서버에 반영되지 않습니다.', 'NETWORK_ERROR');
     } finally { clearTimeout(timer); }
@@ -285,7 +295,10 @@
       try { detail = await response.json(); } catch (_) {}
       const original = detail.message || detail.error || detail.msg || response.statusText;
       let message = `클라우드 요청 실패 (${response.status}): ${original}`;
-      if (response.status === 401 || response.status === 403) message = '클라우드 접근이 거부되었습니다. 공용 키·공유 코드와 SQL 설치 상태를 확인해 주세요.';
+      if (response.status === 401 || response.status === 403) {
+        message = window.OUR_DATE_CONFIG?.passwordGate ? '입장 상태를 다시 확인해 주세요.' : '클라우드 접근이 거부되었습니다. 공용 키·공유 코드와 SQL 설치 상태를 확인해 주세요.';
+        if (window.OUR_DATE_CONFIG?.passwordGate) window.dispatchEvent(new Event('our-date-session-check'));
+      }
       if (response.status === 409) message = `다른 기기에서 먼저 변경했거나 중복된 기록입니다. 새로고침 후 다시 시도해 주세요. ${original}`;
       throw makeError(message, detail.code || 'CLOUD_ERROR', response.status);
     }
@@ -435,9 +448,9 @@
 
   async function rpc(name, parameters = {}, settings = getSettings()) {
     try {
-      if (!['get_storage_usage_cache', 'reconcile_storage_usage', 'adjust_storage_usage', 'restore_empty_backup'].includes(name)) throw makeError('지원하지 않는 서버 함수입니다.');
+      if (!['get_storage_usage_cache', 'reconcile_storage_usage', 'adjust_storage_usage', 'restore_empty_backup', 'get_couple_profile', 'save_couple_profile'].includes(name)) throw makeError('지원하지 않는 서버 함수입니다.');
       if (modeFor(settings) === 'cloud') {
-        const response = await cloudRequest(settings, `/rest/v1/rpc/${name === 'adjust_storage_usage' ? 'reconcile_storage_usage' : name}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(name === 'adjust_storage_usage' ? { p_bucket_id: parameters.p_bucket_id || 'place-images' } : parameters), timeout: 120000 });
+        const response = await cloudRequest(settings, `/rest/v1/rpc/${name === 'adjust_storage_usage' ? 'reconcile_storage_usage' : name}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(name === 'adjust_storage_usage' ? { p_bucket_id: parameters.p_bucket_id || 'place-images' } : parameters), timeout: name === 'restore_empty_backup' ? 120000 : 15000 });
         return { data: await response.json(), error: null };
       }
       if (name === 'restore_empty_backup') throw makeError('이 복원 기능은 클라우드 모드에서만 사용할 수 있습니다.');
@@ -461,6 +474,41 @@
       const total = totalText && totalText !== '*' ? Number(totalText) : null;
       if (!page.length || (total != null && offset >= total) || (total == null && page.length < 500)) return rows;
     }
+  }
+  function validateProfile(value) {
+    if (!value || typeof value !== 'object' || typeof value.names !== 'string' || [...value.names.trim()].length > 40 || typeof value.firstDay !== 'string') throw makeError('기념일 정보가 올바르지 않습니다.');
+    const day = value.firstDay;
+    if (day && (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day < '0001-01-01' || !Number.isFinite(Date.parse(day)) || new Date(day+'T00:00:00Z').toISOString().slice(0,10) !== day)) throw makeError('처음 만난 날짜를 확인해 주세요.');
+    return {names:value.names.trim(), firstDay:day};
+  }
+  function rememberProfile(profile) {
+    if (profile.revision < sharedProfile.revision) return {...sharedProfile};
+    sharedProfile = profile;
+    window.dispatchEvent(new CustomEvent('our-date-profile-changed', {detail:profile}));
+    return {...profile};
+  }
+  async function loadSharedProfile({migrate=false}={}) {
+    if (!window.OUR_DATE_CONFIG?.passwordGate) return {...sharedProfile};
+    const {data,error} = await rpc('get_couple_profile',{});
+    if (error) throw error;
+    rememberProfile(data);
+    if (migrate && data.revision === 0) {
+      let old; try { old=JSON.parse(localStorage.getItem('our-date.preferences.v2')||'null'); } catch (_) {}
+      if (old && (old.names || old.firstDay)) {
+        let value; try {value=validateProfile({names:old.names||'',firstDay:old.firstDay||''});} catch (_) {return {...sharedProfile};}
+        if(value.firstDay && value.firstDay > new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Seoul'}))return {...sharedProfile};
+        const migrated=await rpc('save_couple_profile',{p_names:value.names,p_first_day:value.firstDay,p_expected_revision:0,p_only_if_empty:true});
+        if (migrated.error) throw migrated.error;
+        rememberProfile(migrated.data);
+      }
+    }
+    return {...sharedProfile};
+  }
+  async function saveSharedProfile(value, revision) {
+    const p=validateProfile(value);
+    const {data,error}=await rpc('save_couple_profile',{p_names:p.names,p_first_day:p.firstDay,p_expected_revision:revision,p_only_if_empty:false});
+    if(error)throw error;
+    return rememberProfile(data);
   }
   async function blobBase64(blob) {
     const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -504,13 +552,19 @@
       if (!paths.has(row.storage_path)) throw makeError('백업에 사진 원본이 빠져 있습니다. 전체 백업으로 다시 시도해 주세요.');
       if (row.file_size != null && row.file_size !== 0 && row.file_size !== byPath.get(row.storage_path).size) throw makeError('백업의 사진 크기 정보와 원본 파일이 일치하지 않습니다.');
     }
-    return { tables: structuredClone(backup.tables), photos };
+    const profile = backup.profile == null ? undefined : validateProfile(backup.profile);
+    return { tables: structuredClone(backup.tables), photos, profile };
   }
   async function exportBackup(options = {}) {
     const settings = getSettings();
     const mode = options.mode || modeFor(settings);
     let tables;
     let photos;
+    let profile;
+    if (mode === 'cloud' && window.OUR_DATE_CONFIG?.passwordGate) profile=await loadSharedProfile();
+    if (mode === 'local') {
+      try {const old=JSON.parse(localStorage.getItem('our-date.preferences.v2')||'null');if(old)profile=validateProfile({names:old.names||'',firstDay:old.firstDay||''});} catch (_) {}
+    }
     if (mode === 'local') {
       const snapshot = await transaction(ALL_STORES, false, rows => rows);
       tables = Object.fromEntries(TABLES.map(table => [table, snapshot[table]]));
@@ -540,7 +594,8 @@
       }
     }
     validateTables(tables);
-    return { format: 'our-date-backup', version: 2, createdAt: now(), sourceMode: mode, tables, photos };
+    if (mode === 'cloud' && profile && (await loadSharedProfile()).revision !== profile.revision) throw makeError('백업 중 기념일이 변경됐어요. 다시 백업해 주세요.');
+    return { format: 'our-date-backup', version: 2, createdAt: now(), sourceMode: mode, tables, photos, ...(profile ? {profile:validateProfile(profile)} : {}) };
   }
   async function importBackup(input) {
     if (modeFor(getSettings()) === 'cloud') throw makeError('로컬 복원은 기기 저장 모드에서만 가능합니다. 클라우드 복원 버튼을 이용하거나 클라우드 연결을 해제해 주세요.');
@@ -565,6 +620,7 @@
     const prefix = `restore/${uuid()}/`;
     const mapping = new Map(backup.photos.map(photo => [photo.path, `${prefix}${photo.path}`]));
     const tables = structuredClone(backup.tables);
+    if (backup.profile) tables.profile=backup.profile;
     for (const row of tables.place_images) row.storage_path = mapping.get(row.storage_path);
     const bucket = storage('place-images', settings, 'cloud');
     const attempted = [];
@@ -622,6 +678,8 @@
   window.OurDateStore = {
     client: { from: table => new Query(table), storage: { from: bucket => storage(bucket) }, rpc },
     get mode() { return modeFor(getSettings()); },
+    get profile() { return {...sharedProfile}; },
+    loadSharedProfile, saveSharedProfile,
     getSettings, saveSettings, generatePairKey, exportBackup, importBackup,
     restoreBackupToCloud, promoteLocalToCloud, getLocalCounts, readAllRows, requestPersistentStorage
   };

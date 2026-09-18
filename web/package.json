@@ -1,0 +1,8 @@
+{
+  "name": "our-date-web",
+  "version": "3.0.0",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  }
+}

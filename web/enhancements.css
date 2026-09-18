@@ -7,3 +7,23 @@ body{background:#f5eeeb;color:var(--text);line-height:1.5;letter-spacing:-.025em
 .time-divider{pointer-events:none;width:20px;justify-self:center}
 @media(max-width:390px){.time-divider{width:20px;height:20px}.date-time-wrapper{gap:7px}.custom-time-button{min-height:58px}}
 .calendar-day.has-content:not(.has-time)::after{content:'';width:4px;height:4px;border-radius:50%;background:var(--pink);bottom:6px}
+
+/* Our Date 3.0: remembered entry and shared anniversaries */
+[hidden] {display:none !important;}
+body.is-locked {min-height:100dvh; background:#f5f0e9;}
+body.is-locked .app, body.is-locked .loading-overlay, body.is-locked #loadingOverlay, body.is-locked .od-toast {display:none !important;}
+.entry-gate {min-height:100dvh; display:grid; place-items:center; padding:28px 18px;}
+.entry-card {width:min(100%,440px);text-align:center; background:#fffaf2; border:1px solid #e9dfd2; border-radius:32px; padding:26px 38px 30px;box-shadow:0 22px 70px #77625112;}
+.entry-pandas {width:216px;height:216px;max-width:100%;object-fit:contain;mix-blend-mode:multiply;border-radius:28px;}
+.entry-eyebrow {font-size:10px;letter-spacing:3px;color:#987950;margin:0 0 10px;}
+.entry-card h1 {font-size:28px;letter-spacing:-1.2px;color:#41372e;margin:0 0 12px;}
+.entry-copy {font-size:14px;line-height:1.9;color:#8e7a67;margin:0 0 26px;}
+.entry-card form {text-align:left;}
+.entry-card .od-input {background:#fffefb;border-color:#ddcbb5;}
+.entry-card .od-input:focus {outline:2px solid #a98254;outline-offset:2px;}
+.entry-card .od-button {width:100%;margin-top:14px;background:#906d47;justify-content:center;min-height:48px;}
+.entry-status {min-height:42px;font-size:13px;line-height:1.65;color:#846b53;margin:15px 0 0;}
+.entry-footnote {font-size:11px;color:#aa9682;margin:12px 0 0;}
+.brand img {object-fit:cover;border-radius:16px;}
+#profileStatus {min-height:24px;}
+@media(max-width:480px){.entry-card{padding:24px 25px;border-radius:26px;}.entry-pandas{width:195px;height:195px;}}

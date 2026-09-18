@@ -5,7 +5,8 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<'
 const catName = {restaurant:'음식점',cafe:'카페',activity:'놀 곳'};
 let toastTimer, installPrompt, recordData = [], operationBusy = false;
 const dayKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-const readPrefs = () => {try{return JSON.parse(localStorage.getItem('our-date.preferences.v2')||'{}')}catch{return {}}};
+const readPrefs = () => OurDateStore.profile;
+let profileRevision = null, profileDirty = false;
 function toast(text) {$('odToast').textContent=text;$('odToast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('odToast').hidden=true,4200);}
 function showDialog(id){$(id).showModal();$(id).classList.add('active');trackModalOpen(id);}
 function closeDialog(id){
@@ -46,50 +47,48 @@ function renderAgenda(){
 }
 function openKey(key){const [y,m,d]=key.split('-').map(Number);return openDate(y,m-1,d);}
 async function currentMonth(){if(operationBusy)return;viewingMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);try{await loadMonthData();renderCalendar();}catch(e){toast(e.message);}}
-async function refresh(){if(operationBusy)return;try{await loadMonthData();renderCalendar();await refreshStorageUsage();toast('최신 기록을 불러왔어요.');}catch(e){toast(e.message);}}
-function openSettings(){
- const s=OurDateStore.getSettings(),p=readPrefs();
- $('serverUrl').value=s.supabaseUrl||'';$('publicKey').value=s.publishableKey||'';$('pairKey').value=s.pairKey||'';$('kakaoKey').value=s.kakaoKey||'';
- $('coupleNames').value=p.names||'';$('firstDay').value=p.firstDay||'';
- document.querySelector(`input[name="odMode"][value="${OurDateStore.mode}"]`).checked=true;
- $('connectionStatus').textContent='';$('backupStatus').textContent='';
+async function refresh(){if(operationBusy)return;try{await OurDateStore.loadSharedProfile();await loadMonthData();renderCalendar();await refreshStorageUsage();toast('최신 기록을 불러왔어요.');}catch(e){toast(e.message);}}
+async function openSettings(){
+ $('backupStatus').textContent='';$('profileStatus').textContent='기념일을 불러오고 있어요…';
+ profileRevision=null;profileDirty=false;$('savePreferences').disabled=true;
+ $('coupleNames').disabled=true;$('firstDay').disabled=true;
  const last=localStorage.getItem('our-date.last-backup.v2');$('lastBackup').textContent=last?`마지막 백업: ${new Date(last).toLocaleString('ko-KR')}`:'아직 이 기기에서 만든 백업이 없어요.';
- $('promoteButton').hidden=OurDateStore.mode!=='cloud';
  showDialog('odSettings');
+ try {
+  const p=await OurDateStore.loadSharedProfile();
+  $('coupleNames').value=p.names;$('firstDay').value=p.firstDay;$('firstDay').max=dayKey(new Date());profileRevision=p.revision;
+  $('profileStatus').textContent='두 기기가 같은 기념일을 보고 있어요.';
+ }catch(e){$('profileStatus').textContent=e.message+' 닫았다 다시 열어 주세요.';}
+ finally{$('savePreferences').disabled=profileRevision===null;$('coupleNames').disabled=profileRevision===null;$('firstDay').disabled=profileRevision===null;}
+ try{const counts=await OurDateStore.getLocalCounts();$('promoteButton').hidden=!(counts.dates||counts.places||counts.photos);}catch(_){$('promoteButton').hidden=true;}
 }
-function savePreferences(){
- const names=$('coupleNames').value.trim();const firstDay=$('firstDay').value;
- if(firstDay&&firstDay>dayKey(new Date())){toast('처음 만난 날은 오늘 이전 날짜로 선택해 주세요.');return;}
- localStorage.setItem('our-date.preferences.v2',JSON.stringify({names,firstDay}));status();toast('우리의 기념일을 저장했어요.');
+async function savePreferences(){
+ if(operationBusy||profileRevision===null)return;
+ const names=$('coupleNames').value.trim(),firstDay=$('firstDay').value;
+ if(firstDay&&firstDay>dayKey(new Date())){toast('처음 만난 날은 오늘까지의 날짜로 선택해 주세요.');return;}
+ operationBusy=true;$('savePreferences').disabled=true;$('profileStatus').textContent='함께 기억할 날을 저장하고 있어요…';
+ try{const p=await OurDateStore.saveSharedProfile({names,firstDay},profileRevision);profileRevision=p.revision;profileDirty=false;$('profileStatus').textContent='두 기기에 함께 저장했어요.';status();toast('우리의 기념일을 저장했어요.');}
+ catch(e){$('profileStatus').textContent=e.code==='40001'?'상대방이 먼저 변경했어요. 창을 닫았다 다시 열어 최신 기념일을 확인해 주세요.':e.message;}
+ finally{operationBusy=false;$('savePreferences').disabled=false;}
 }
-async function saveConnection(){
+async function lockDevice(){
  if(operationBusy)return;
- operationBusy=true;
- for(const id of ['backupButton','restoreButton','saveConnection','promoteButton'])$(id).disabled=true;
- const mode=document.querySelector('input[name="odMode"]:checked').value;
- const next={mode,supabaseUrl:$('serverUrl').value.trim(),publishableKey:$('publicKey').value.trim(),pairKey:$('pairKey').value.trim(),kakaoKey:$('kakaoKey').value.trim()};
- const old=OurDateStore.getSettings();
- $('saveConnection').disabled=true;$('connectionStatus').textContent='설정을 확인하고 있어요…';
- try{
-  await OurDateStore.saveSettings(next);
-  if(mode==='cloud'){const r=await OurDateStore.client.rpc('get_storage_usage_cache',{p_bucket_id:'place-images'});if(r.error)throw new Error(r.error.message||'공유 서버 연결을 확인해 주세요.');}
-  $('connectionStatus').textContent='연결 확인 완료. 화면을 새로 열어요. 기기 기록은 그대로 보관됩니다.';
-  location.reload();
- }catch(e){await OurDateStore.saveSettings(old);$('connectionStatus').textContent=e.message;}
- finally{operationBusy=false;for(const id of ['backupButton','restoreButton','saveConnection','promoteButton'])$(id).disabled=false;}
+ if(!confirm('작성 중인 내용은 저장하셨나요? 이 기기를 잠그면 다음에 비밀번호를 다시 입력해요.'))return;
+ try{await OurDateGate.logout();}catch(e){toast(e.message);}
 }
 function download(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
-async function busy(task){if(operationBusy)return;operationBusy=true;for(const id of ['backupButton','restoreButton','saveConnection','promoteButton'])$(id).disabled=true;try{await task();}catch(e){$('backupStatus').textContent=e.message;}finally{operationBusy=false;for(const id of ['backupButton','restoreButton','saveConnection','promoteButton'])$(id).disabled=false;}}
+async function busy(task){if(operationBusy)return;operationBusy=true;for(const id of ['backupButton','restoreButton','savePreferences','promoteButton','lockDevice'])$(id).disabled=true;try{await task();}catch(e){$('backupStatus').textContent=e.message;}finally{operationBusy=false;for(const id of ['backupButton','restoreButton','savePreferences','promoteButton','lockDevice'])$(id).disabled=false;}}
 async function backup(){await busy(async()=>{
  $('backupStatus').textContent='날짜와 장소, 사진 파일을 모으고 있어요. 완료될 때까지 앱을 열어 두세요.';
  const data=await OurDateStore.exportBackup();
  download(new Blob([JSON.stringify(data)],{type:'application/json'}),`Our-Date-backup-${dayKey(new Date())}.json`);
  localStorage.setItem('our-date.last-backup.v2',new Date().toISOString());
+ $('lastBackup').textContent=`마지막 백업: ${new Date().toLocaleString('ko-KR')}`;
  $('backupStatus').textContent=`백업 파일을 만들었어요. 날짜 ${data.tables.dates.length}개 · 장소 ${data.tables.places.length}개 · 사진 ${data.photos.length}개. 다운로드한 파일을 별도 위치에도 보관해 주세요.`;
  });}
 async function restore(file){if(!file)return;if(!confirm(`${OurDateStore.mode==='cloud'?'공유 서버':'이 기기'}의 비어 있는 저장 공간에 이 백업을 복원할까요? 기존 기록이 있으면 중단됩니다.`))return;
- await busy(async()=>{ $('backupStatus').textContent='백업을 확인하고 복원하는 중이에요…';if(OurDateStore.mode==='cloud')await OurDateStore.restoreBackupToCloud(file);else await OurDateStore.importBackup(file);await loadMonthData();renderCalendar();await refreshStorageUsage();$('backupStatus').textContent='복원이 완료됐어요. 달력에서 기록과 사진을 확인해 주세요.';});}
-async function promote(){if(!confirm('이 기기에 남아 있는 기록과 사진을 현재 연결된 빈 공유 서버로 복사할까요? 기기 원본은 유지됩니다.'))return;await busy(async()=>{$('backupStatus').textContent='기기 기록과 사진을 서버로 복사하고 있어요…';await OurDateStore.promoteLocalToCloud();await loadMonthData();renderCalendar();await refreshStorageUsage();$('backupStatus').textContent='공유 서버에 복사했어요. 상대방 기기에서도 새로고침해 확인해 주세요.';});}
+ await busy(async()=>{ $('backupStatus').textContent='백업을 확인하고 복원하는 중이에요…';if(OurDateStore.mode==='cloud')await OurDateStore.restoreBackupToCloud(file);else await OurDateStore.importBackup(file);await OurDateStore.loadSharedProfile();await loadMonthData();renderCalendar();await refreshStorageUsage();$('backupStatus').textContent='복원이 완료됐어요. 달력에서 기록과 사진을 확인해 주세요.';});}
+async function promote(){if(!confirm('이 기기에 남아 있는 기록과 사진을 현재 연결된 빈 공유 서버로 복사할까요? 기기 원본은 유지됩니다.'))return;await busy(async()=>{$('backupStatus').textContent='기기 기록과 사진을 서버로 복사하고 있어요…';await OurDateStore.promoteLocalToCloud();await OurDateStore.loadSharedProfile();await loadMonthData();renderCalendar();await refreshStorageUsage();$('backupStatus').textContent='공유 서버에 복사했어요. 상대방 기기에서도 새로고침해 확인해 주세요.';});}
 async function openRecords(){
  showDialog('odRecords');$('recordSearch').value='';$('recordResults').textContent='기록을 불러오고 있어요…';$('recordSummary').textContent='';
  try{const [dates,places,images]=await Promise.all(['dates','places','place_images'].map(t=>OurDateStore.readAllRows(t)));
@@ -123,11 +122,11 @@ async function exportCalendar(){
 function install(){if(!installPrompt){toast('브라우저 메뉴에서 홈 화면에 추가를 선택해 주세요.');return;}installPrompt.prompt();installPrompt=null;$('installButton').style.display='none';}
 function setupMap(){
  const key=OurDateStore.getSettings().kakaoKey;
- if(!key){document.querySelector('.place-search-help').textContent='장소를 직접 입력할 수 있어요. 앱 설정에 Kakao JavaScript 키를 넣으면 장소검색과 지도를 사용할 수 있어요.';return;}
+ if(!key){document.querySelector('.place-search-help').textContent='장소를 직접 입력할 수 있어요. 지도 연결은 잠시 후 다시 확인해 주세요.';return;}
  const script=document.createElement('script');script.src=`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&libraries=services&autoload=false`;
  script.onload=()=>{if(window.kakao?.maps)kakao.maps.load(()=>window.dispatchEvent(new Event('ourdate-map-ready')));};script.onerror=()=>console.warn('지도 연결을 확인해 주세요.');document.head.appendChild(script);
 }
-window.OD={openSettings,closeDialog,openRecords,savePreferences,saveConnection,backup,promote,refresh,currentMonth,install,openToday:()=>openKey(dayKey(new Date())),generateKey(){ $('pairKey').value=OurDateStore.generatePairKey();$('pairKey').type='text';toast('새 코드예요. 먼저 설치 SQL에 같은 코드를 등록해 주세요.');},toggleKey(){ $('pairKey').type=$('pairKey').type==='password'?'text':'password';},exportCalendar};
+window.OD={openSettings,closeDialog,openRecords,savePreferences,backup,promote,refresh,currentMonth,install,lockDevice,openToday:()=>openKey(dayKey(new Date())),exportCalendar};
 const originalRender=renderCalendar;renderCalendar=function(...args){const v=originalRender(...args);renderAgenda();return v;};
 const originalStorage=renderStorageUsage;renderStorageUsage=function(usage){originalStorage(usage);if(OurDateStore.mode==='local'){$('storageUsageValue').textContent=formatStorageBytes(Number(usage?.total_bytes||0));$('storagePhotoCount').textContent=`사진 ${Number(usage?.photo_count||0)}개 · 이 기기에 보관`;$('storageUsageFill').style.width='0%';}};
 const actions=document.createElement('div');actions.className='od-date-actions';actions.innerHTML='<button type="button" class="od-text-button" onclick="OD.exportCalendar()">휴대폰 달력에 추가 ↗</button>';$('saveDateButton').after(actions);
@@ -150,9 +149,23 @@ renderDateMap=function(...args){
  if(window.kakao?.maps && typeof window.kakao.maps.Map!=='function'){
   $('dateMap').innerHTML='<div class="empty-state">지도를 준비하고 있어요…</div>';renderDateMapPlaceList(getAllPlacesForSelectedDate());return;
  }
- if(!OurDateStore.getSettings().kakaoKey){$('dateMap').innerHTML='<div class="empty-state"><strong>지도 연결이 아직 없어요</strong><p>설정에 Kakao JavaScript 키를 입력하면<br>후보들의 위치를 함께 볼 수 있어요.</p></div>';renderDateMapPlaceList(getAllPlacesForSelectedDate());return;}
+ if(!OurDateStore.getSettings().kakaoKey){$('dateMap').innerHTML='<div class="empty-state"><strong>지도 연결이 아직 없어요</strong><p>잠시 후 다시 열어 주세요.<br>장소는 목록에서 확인할 수 있어요.</p></div>';renderDateMapPlaceList(getAllPlacesForSelectedDate());return;}
  return renderMapOriginal(...args);
 };
 window.addEventListener('ourdate-map-ready',()=>{if($('mapScreen').classList.contains('active'))renderDateMap();});
-setupMap();renderAgenda();
+for(const id of ['coupleNames','firstDay'])$(id).addEventListener('input',()=>{profileDirty=true;});
+window.addEventListener('our-date-profile-changed',()=>{
+ status();
+ if($('odSettings').open&&!profileDirty&&profileRevision!==null){const p=readPrefs();$('coupleNames').value=p.names;$('firstDay').value=p.firstDay;profileRevision=p.revision;}
+});
+let profileRefreshBusy=false;
+async function backgroundProfile(){
+ if(!OurDateGate.token||document.hidden||profileRefreshBusy||operationBusy)return;
+ profileRefreshBusy=true;try{await OurDateStore.loadSharedProfile();}catch(e){$('modeText').textContent='공유 상태를 확인하지 못했어요 · 새로고침해 주세요.';}finally{profileRefreshBusy=false;}
+}
+window.addEventListener('focus',backgroundProfile);
+window.addEventListener('our-date-session-resumed',backgroundProfile);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)backgroundProfile();});
+setInterval(backgroundProfile,30000);
+OurDateGate.ready.then(()=>{setupMap();renderAgenda();});
 })();

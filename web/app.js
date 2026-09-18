@@ -3974,7 +3974,7 @@ function searchKakaoPlaces() {
   ) {
 
     showKakaoSearchMessage(
-      "카카오 장소 검색을 불러오지 못했어. 카카오맵 설정을 확인해줘."
+      "장소 검색에 연결하지 못했어요. 잠시 후 다시 시도하거나 직접 입력해 주세요."
     );
 
     return;
@@ -7409,7 +7409,7 @@ async function refreshStorageUsage(
   } catch (error) {
     console.warn("저장공간 사용량 조회 실패:", error);
     valueElement.textContent = "확인 실패";
-    countElement.textContent = "Supabase 설정 SQL을 먼저 실행해줘.";
+    countElement.textContent = "인터넷 연결 후 다시 확인해 주세요.";
   }
 }
 
@@ -8472,6 +8472,8 @@ function escapeHtml(
 
 async function initializeApp() {
 
+  if (window.OurDateGate) await OurDateGate.ready;
+
   initializeTimePicker();
 
 
@@ -8492,6 +8494,7 @@ async function initializeApp() {
 
   try {
 
+    await OurDateStore.loadSharedProfile({migrate:true});
     await loadMonthData();
 
 
