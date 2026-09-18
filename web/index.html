@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Our Date · 우리의 하루</title>
+<meta name="description" content="우리 둘의 약속과 장소, 사진을 차곡차곡 모으는 작은 공간">
+<link rel="icon" type="image/png" href="./icons/icon-v2-192.png">
+
+<meta name="theme-color" content="#fffaf8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Our Date">
+
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icon-v2-192.png">
+
+<link rel="stylesheet" href="./styles.css">
+<link rel="stylesheet" href="./enhancements.css">
+</head>
+
+
+<body>
+
+<div class="app">
+
+
+<!-- ========================================
+     CALENDAR SCREEN
+======================================== -->
+
+<section
+  id="calendarScreen"
+  class="screen active"
+>
+
+  <div class="calendar-header-main">
+    <div class="brand"><img src="./icons/icon-v2-192.png" alt="우리의 병아리" width="46" height="46"><div><small>OUR LITTLE DAYS</small><h1>Our Date<span style="color:var(--pink)">.</span></h1></div></div>
+    <div class="header-actions">
+      <button type="button" class="od-icon-button wide" onclick="OD.openRecords()" aria-label="모든 기록 검색"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><span class="header-record-label">기록 찾기</span></button>
+      <button type="button" class="od-icon-button" onclick="OD.openSettings()" aria-label="설정과 백업"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="white"/><circle cx="15" cy="17" r="3" fill="white"/></svg></button>
+    </div>
+  </div>
+  <div id="modeBar" class="mode-bar"><span class="mode-dot"></span><span id="modeText">저장 상태 확인 중</span><button type="button" class="mode-link" onclick="OD.refresh()">새로고침 ↻</button></div>
+  <div class="od-hero"><div class="eyebrow" id="heroEyebrow">A LITTLE PLAN, A LOVELY DAY</div><h2 id="heroTitle">함께할 다음 하루</h2><p id="heroDescription">가고 싶은 곳부터, 기억하고 싶은 순간까지.</p><button type="button" class="od-pill" onclick="OD.openToday()">오늘의 약속 쓰기 ↗</button></div>
+  <div class="calendar-layout"><div class="calendar-column">
+  <div class="month-controller">
+
+    <button
+      type="button"
+      onclick="changeMonth(-1)"
+    >
+      ‹
+    </button>
+
+    <button
+      id="monthTitleButton"
+      type="button"
+      class="month-title-button"
+      aria-haspopup="dialog"
+      aria-expanded="false"
+      onclick="openMonthPicker()"
+    >
+      <span id="monthTitle"></span>
+      <span
+        class="month-title-chevron"
+        aria-hidden="true"
+      >
+       ⌄
+      </span>
+    </button>
+
+    <button
+      type="button"
+      onclick="changeMonth(1)"
+    >
+      ›
+    </button>
+
+  </div>
+
+
+  <div class="calendar-wrapper">
+
+    <div class="weekdays">
+
+      <div>일</div>
+      <div>월</div>
+      <div>화</div>
+      <div>수</div>
+      <div>목</div>
+      <div>금</div>
+      <div>토</div>
+
+    </div>
+
+    <div
+      id="calendar"
+      class="calendar"
+    ></div>
+
+  </div>
+
+
+  <div class="calendar-legend"><span><i class="legend-dot outline"></i>오늘</span><span><i class="legend-dot"></i>기록이 있는 날</span><button class="mode-link" type="button" onclick="OD.currentMonth()">이번 달</button></div>
+  </div><aside class="agenda-column"><div class="agenda-heading"><h3>이달의 우리</h3><span id="agendaCount">0일의 기록</span></div><div id="agendaList" class="agenda-list"></div>
+  <div
+    id="storageUsageCard"
+    class="storage-usage-card"
+  >
+
+    <div class="storage-usage-top">
+
+      <div class="storage-usage-title">
+        사진 저장공간
+      </div>
+
+      <div
+        id="storageUsageValue"
+        class="storage-usage-value"
+      >
+        계산 중...
+      </div>
+
+    </div>
+
+    <div class="storage-usage-bar">
+
+      <div
+        id="storageUsageFill"
+        class="storage-usage-fill"
+      ></div>
+
+    </div>
+
+    <div class="storage-usage-bottom">
+
+      <span id="storagePhotoCount">
+        사진 수 계산 중...
+      </span>
+
+      <button
+        type="button"
+        class="storage-refresh-button"
+        onclick="refreshStorageUsage(true)"
+      >
+        실제값 확인
+      </button>
+
+    </div>
+
+  </div>
+
+</aside></div>
+  <nav class="od-bottom-nav" aria-label="주 메뉴"><button class="active" type="button" onclick="OD.currentMonth()"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 2v6m10-6v6M3 11h18"/></svg>달력</button><button type="button" onclick="OD.openRecords()"><svg viewBox="0 0 24 24"><path d="M3 5h7l2 2h9v13H3z"/><path d="m8 13 2 2 5-5"/></svg>우리의 기록</button><button type="button" onclick="OD.openSettings()"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="white"/><circle cx="15" cy="17" r="3" fill="white"/></svg>설정 · 백업</button></nav>
+</section>
+
+
+
+<!-- ========================================
+     DATE SCREEN
+======================================== -->
+
+<section
+  id="dateScreen"
+  class="screen"
+>
+
+  <div class="topbar">
+
+    <button
+      type="button"
+      class="back-button"
+      onclick="history.back()"
+    >
+      ‹
+    </button>
+
+    <div class="topbar-title">
+      데이트
+    </div>
+
+    <div class="topbar-space"></div>
+
+  </div>
+
+
+  <div class="detail-content">
+
+    <div class="date-heading">
+
+      <h2 id="dateTitle"></h2>
+
+      
+
+    </div>
+
+
+    <div class="block">
+
+      <div class="block-title">
+        시간
+      </div>
+
+
+      <div class="date-time-wrapper">
+
+        <div class="time-selector">
+
+          <div class="time-label">
+            시작
+          </div>
+
+          <button
+            id="startTimeButton"
+            type="button"
+            class="custom-time-button"
+            onclick="openTimePicker('startTime')"
+          >
+
+            <div class="time-icon">
+              ◷
+            </div>
+
+            <div
+              id="startTimeDisplay"
+              class="time-button-text"
+            >
+              시간 선택
+            </div>
+
+          </button>
+
+          <input
+            id="startTime"
+            type="hidden"
+          >
+
+        </div>
+
+
+        <div class="time-divider">
+          →
+        </div>
+
+
+        <div class="time-selector">
+
+          <div class="time-label">
+            종료
+          </div>
+
+          <button
+            id="endTimeButton"
+            type="button"
+            class="custom-time-button"
+            onclick="openTimePicker('endTime')"
+          >
+
+            <div class="time-icon">
+              ◷
+            </div>
+
+            <div
+              id="endTimeDisplay"
+              class="time-button-text"
+            >
+              시간 선택
+            </div>
+
+          </button>
+
+          <input
+            id="endTime"
+            type="hidden"
+          >
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="block">
+
+      <div class="block-title">
+        데이트 후보
+      </div>
+
+
+      <div class="category-list">
+
+        <button
+          type="button"
+          class="category-card"
+          onclick="openCategory('restaurant')"
+        >
+
+          <div class="category-icon">
+            🍽️
+          </div>
+
+          <div class="category-info">
+
+            <strong>
+              음식점
+            </strong>
+
+            <span id="restaurantCount">
+              후보 0곳
+            </span>
+
+          </div>
+
+          <div class="category-arrow">
+            ›
+          </div>
+
+        </button>
+
+
+        <button
+          type="button"
+          class="category-card"
+          onclick="openCategory('cafe')"
+        >
+
+          <div class="category-icon">
+            ☕
+          </div>
+
+          <div class="category-info">
+
+            <strong>
+              카페
+            </strong>
+
+            <span id="cafeCount">
+              후보 0곳
+            </span>
+
+          </div>
+
+          <div class="category-arrow">
+            ›
+          </div>
+
+        </button>
+
+
+        <button
+          type="button"
+          class="category-card"
+          onclick="openCategory('activity')"
+        >
+
+          <div class="category-icon">
+            🎡
+          </div>
+
+          <div class="category-info">
+
+            <strong>
+              놀 곳
+            </strong>
+
+            <span id="activityCount">
+              후보 0곳
+            </span>
+
+          </div>
+
+          <div class="category-arrow">
+            ›
+          </div>
+
+        </button>
+
+      </div>
+
+    </div>
+
+
+    <div class="block">
+
+      <button
+        type="button"
+        class="map-open-button"
+        onclick="openDateMap()"
+      >
+        지도 보기
+      </button>
+
+    </div>
+
+
+    <div class="block">
+
+      <div class="block-title">
+        메모
+      </div>
+
+      <textarea
+        id="dateMemo" aria-label="데이트 메모" placeholder="이날 하고 싶은 일, 잊지 않을 이야기…" maxlength="10000"
+      ></textarea>
+
+    </div>
+
+
+    <button
+      id="saveDateButton"
+      type="button"
+      class="save-button"
+      onclick="saveDateInfo().catch(() => {})"
+    >
+      저장
+    </button>
+
+  </div>
+
+</section>
+
+
+
+<!-- ========================================
+     CATEGORY SCREEN
+======================================== -->
+
+<section
+  id="categoryScreen"
+  class="screen"
+>
+
+  <div class="topbar">
+
+    <button
+      type="button"
+      class="back-button"
+      onclick="history.back()"
+    >
+      ‹
+    </button>
+
+    <div
+      id="categoryTitle"
+      class="topbar-title"
+    ></div>
+
+    <div class="topbar-space"></div>
+
+  </div>
+
+
+  <div
+    id="placeList"
+    class="category-content"
+  ></div>
+
+
+  <button
+    id="addPlaceButton"
+    type="button"
+    class="floating-add"
+    onclick="openPlaceModal()"
+  >
+    + 후보 추가
+  </button>
+
+</section>
+
+
+
+<!-- ========================================
+     MAP SCREEN
+======================================== -->
+
+<section
+  id="mapScreen"
+  class="screen"
+>
+
+  <div class="topbar">
+
+    <button
+      type="button"
+      class="back-button"
+      onclick="history.back()"
+    >
+      ‹
+    </button>
+
+    <div class="topbar-title">
+      후보 지도
+    </div>
+
+    <div class="topbar-space"></div>
+
+  </div>
+
+
+  <div class="map-screen-content">
+
+    <div
+      id="dateMap"
+      class="date-map"
+    ></div>
+
+
+    <div class="map-list-section">
+
+      <div class="map-list-heading">
+        이날의 후보
+      </div>
+
+      <div class="map-list-description">
+        장소를 누르면 지도에서 그 후보 위치로 이동해.
+      </div>
+
+      <div
+        id="mapPlaceList"
+        class="map-place-list"
+      ></div>
+
+      <div
+        id="mapCoordinateWarning"
+        class="map-warning"
+      >
+        위치 정보가 없는 예전 후보는 지도에 표시되지 않아.
+        후보 수정에서 카카오 장소 검색 결과를 선택한 뒤 저장하면 지도에도 표시돼.
+      </div>
+
+    </div>
+
+  </div>
+
+</section>
+
+</div>
+
+
+
+<!-- ========================================
+     PLACE MODAL
+======================================== -->
+
+<div
+  id="placeModal"
+  class="modal-background"
+>
+
+  <div class="modal">
+
+    <h3 id="modalTitle">
+      후보 추가
+    </h3>
+
+
+    <div class="place-search-box">
+
+      <div class="place-search-title">
+        카카오 장소 검색
+      </div>
+
+      <div class="place-search-row">
+
+        <input
+          id="kakaoPlaceKeyword" aria-label="장소 검색어" placeholder="어디로 가볼까?"
+          type="text"
+          onkeydown="handleKakaoSearchKeydown(event)"
+        >
+
+        <button
+          type="button"
+          class="place-search-button"
+          onclick="searchKakaoPlaces()"
+        >
+          검색
+        </button>
+
+      </div>
+
+      <div class="place-search-help">
+        검색 결과를 선택하면 장소 이름, 주소와 지도용 위치가 자동으로 저장돼.
+      </div>
+
+      <div
+        id="kakaoPlaceResults"
+        class="place-search-results"
+      ></div>
+
+      <div
+        id="selectedKakaoPlace"
+        class="place-selected-box"
+      >
+
+        <div class="place-selected-label">
+          ✓ 선택된 장소
+        </div>
+
+        <div
+          id="selectedKakaoPlaceName"
+          class="place-selected-name"
+        ></div>
+
+        <div
+          id="selectedKakaoPlaceAddress"
+          class="place-selected-address"
+        ></div>
+
+        <div
+          id="previousPlaceSection"
+          class="previous-place-section"
+        >
+
+          <div class="previous-place-heading">
+            이전에 등록한 기록
+          </div>
+
+          <div
+            id="previousPlaceList"
+            class="previous-place-list"
+          ></div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="form-group">
+
+      <label>
+        장소 이름
+      </label>
+
+      <input
+        id="placeName" maxlength="200"
+        type="text"
+        oninput="clearSelectedKakaoCoordinates()"
+      >
+
+    </div>
+
+
+    <div class="form-group">
+
+      <label>
+        주소
+      </label>
+
+      <input
+        id="placeAddress" maxlength="1000"
+        type="text"
+        oninput="clearSelectedKakaoCoordinates()"
+      >
+
+    </div>
+
+
+    <input
+      id="placeLatitude"
+      type="hidden"
+    >
+
+    <input
+      id="placeLongitude"
+      type="hidden"
+    >
+
+
+    <div class="form-group">
+
+      <label>
+        메모
+      </label>
+
+      <textarea
+        id="placeMemo" maxlength="10000"
+      ></textarea>
+
+    </div>
+
+
+    <div class="form-group">
+
+      <label>
+        사진
+      </label>
+
+
+      <input
+        id="placeImage"
+        class="hidden-file-input"
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif"
+        multiple
+        onchange="previewPlaceImages(event)"
+      >
+
+
+      <label
+        id="photoUploadBox"
+        class="photo-upload-box"
+        for="placeImage"
+      >
+
+        <div class="upload-icon">
+          ▧
+        </div>
+
+        <div class="upload-title">
+          사진 추가
+        </div>
+
+        <div class="upload-description">
+          여러 장을 선택할 수 있어요
+        </div>
+
+        <div class="upload-button-look">
+          사진 선택
+        </div>
+
+      </label>
+
+
+      <div
+        id="imagePreviewWrapper"
+        class="image-preview-wrapper"
+      >
+
+        <div
+          id="imagePreviewGallery"
+          class="image-preview-gallery"
+        ></div>
+
+        <div class="image-preview-status">
+
+          <span
+            id="imagePreviewCounter"
+            class="image-preview-counter"
+          ></span>
+
+          <div
+            id="imagePreviewDots"
+            class="image-preview-dots"
+          ></div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="modal-buttons">
+
+      <button
+        type="button"
+        class="cancel"
+        onclick="closePlaceModal()"
+      >
+        취소
+      </button>
+
+      <button
+        id="savePlaceButton"
+        type="button"
+        class="confirm"
+        onclick="savePlace()"
+      >
+        저장
+      </button>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
+<!-- ========================================
+     MONTH PICKER
+======================================== -->
+
+<div
+  id="monthPickerModal"
+  class="month-picker-background"
+  role="dialog"
+  aria-modal="true"
+  aria-label="연도와 월 선택"
+  onclick="handleMonthPickerBackground(event)"
+>
+
+  <div class="month-picker">
+
+    <div class="month-picker-year-row">
+
+      <button
+        type="button"
+        class="month-picker-year-button"
+        aria-label="이전 연도"
+        onclick="changeMonthPickerYear(-1)"
+      >
+        ‹
+      </button>
+
+      <div
+        id="monthPickerYear"
+        class="month-picker-year"
+      ></div>
+
+      <button
+        type="button"
+        class="month-picker-year-button"
+        aria-label="다음 연도"
+        onclick="changeMonthPickerYear(1)"
+      >
+        ›
+      </button>
+
+    </div>
+
+    <div
+      id="monthPickerGrid"
+      class="month-picker-grid"
+    ></div>
+
+  </div>
+
+</div>
+
+
+<!-- ========================================
+     FULLSCREEN IMAGE VIEWER
+======================================== -->
+
+<div
+  id="imageViewer"
+  class="image-viewer"
+  onclick="handleImageViewerBackground(event)"
+>
+
+  <button
+    type="button"
+    class="image-viewer-close"
+    onclick="closeImageViewer()"
+  >
+    ×
+  </button>
+
+  <button
+    type="button"
+    class="image-viewer-nav image-viewer-prev"
+    onclick="changeImageViewer(-1)"
+  >
+    ‹
+  </button>
+
+  <div
+    id="imageViewerStage"
+    class="image-viewer-stage"
+  >
+
+    <img
+      id="imageViewerImage"
+      class="image-viewer-image"
+      alt="사진"
+      draggable="false"
+    >
+
+  </div>
+
+  <button
+    type="button"
+    class="image-viewer-nav image-viewer-next"
+    onclick="changeImageViewer(1)"
+  >
+    ›
+  </button>
+
+  <div class="image-viewer-footer">
+
+    <div
+      id="imageViewerCounter"
+      class="image-viewer-counter"
+    ></div>
+
+    <div
+      id="imageViewerDots"
+      class="image-viewer-dots"
+    ></div>
+
+  </div>
+
+</div>
+
+
+<!-- ========================================
+     TIME PICKER
+======================================== -->
+
+<div
+  id="timePickerModal"
+  class="time-modal-background"
+>
+
+  <div class="time-modal">
+
+    <div class="time-modal-title">
+      시간 선택
+    </div>
+
+
+    <div class="time-select-row">
+
+      <div class="pretty-select">
+
+        <select id="timePeriod">
+
+          <option value="AM">
+            오전
+          </option>
+
+          <option value="PM">
+            오후
+          </option>
+
+        </select>
+
+      </div>
+
+
+      <div class="pretty-select">
+
+        <select id="timeHour"></select>
+
+      </div>
+
+
+      <div class="time-colon">
+        :
+      </div>
+
+
+      <div class="pretty-select">
+
+        <select id="timeMinute"></select>
+
+      </div>
+
+    </div>
+
+
+    <div class="time-modal-actions">
+
+      <button
+        type="button"
+        class="time-clear-button"
+        onclick="clearSelectedTime()"
+      >
+        시간 삭제
+      </button>
+
+      <button
+        type="button"
+        class="time-confirm-button"
+        onclick="confirmSelectedTime()"
+      >
+        선택
+      </button>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
+<!-- ========================================
+     LOADING
+======================================== -->
+
+<div
+  id="loadingOverlay"
+  class="loading-overlay"
+>
+
+  <div
+    id="loadingText"
+    class="loading-box"
+  >
+    불러오는 중...
+  </div>
+
+</div>
+
+
+
+<!-- ========================================
+     SUCCESS POPUP
+======================================== -->
+
+<div
+  id="successOverlay"
+  class="success-overlay"
+>
+
+  <div class="success-card">
+
+    <div class="success-icon">
+      ✓
+    </div>
+
+    <div
+      id="successTitle"
+      class="success-title"
+    >
+      저장 완료
+    </div>
+
+    <div
+      id="successMessage"
+      class="success-message"
+    ></div>
+
+    <button
+      type="button"
+      class="success-confirm"
+      onclick="closeSuccessModal()"
+    >
+      확인
+    </button>
+
+  </div>
+
+</div>
+
+
+
+<!-- ========================================
+     DELETE POPUP
+======================================== -->
+
+<div
+  id="deleteOverlay"
+  class="delete-overlay"
+>
+
+  <div class="delete-card">
+
+    <div class="delete-icon">
+      !
+    </div>
+
+    <div class="delete-title">
+      후보를 삭제할까?
+    </div>
+
+    <div class="delete-message">
+      삭제한 후보는 다시 되돌릴 수 없어.
+    </div>
+
+    <div class="delete-actions">
+
+      <button
+        type="button"
+        class="delete-cancel"
+        onclick="closeDeleteModal()"
+      >
+        취소
+      </button>
+
+      <button
+        type="button"
+        class="delete-confirm"
+        onclick="confirmDeletePlace()"
+      >
+        삭제
+      </button>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+  
+
+<dialog id="odSettings" class="od-dialog" aria-labelledby="settingsTitle">
+  <div class="dialog-head"><h2 id="settingsTitle">우리의 공간 설정</h2><button class="od-icon-button" type="button" onclick="OD.closeDialog('odSettings')" aria-label="설정 닫기">×</button></div>
+  <div class="dialog-body">
+    <section class="settings-section"><h3>작은 기념일</h3><p>두 사람의 이름과 처음 만난 날을 이 기기에 기억해 둘게요.</p><label class="field-label" for="coupleNames">함께 부를 이름</label><input class="od-input" id="coupleNames" maxlength="40" placeholder="예: 우리 둘"><label class="field-label" for="firstDay">처음 만난 날</label><input class="od-input" id="firstDay" type="date"><div class="button-row"><button class="od-button secondary" type="button" onclick="OD.savePreferences()">기념일 저장</button><button id="installButton" class="od-button light od-install" type="button" onclick="OD.install()">앱 설치</button></div></section>
+    <section class="settings-section"><h3>저장할 공간</h3><div class="settings-mode"><label><input type="radio" name="odMode" value="local">이 기기에 저장</label><label><input type="radio" name="odMode" value="cloud">둘이 함께 저장</label></div><p class="od-note">기기 저장은 현재 브라우저에만 남아요. 함께 저장은 같은 서버와 공유코드를 사용하고, 인터넷 연결이 필요해요.</p>
+      <label class="field-label" for="serverUrl">Supabase 프로젝트 URL</label><input class="od-input" id="serverUrl" type="url" placeholder="https://프로젝트.supabase.co" autocomplete="off" spellcheck="false">
+      <label class="field-label" for="publicKey">Supabase publishable key</label><input class="od-input" id="publicKey" placeholder="sb_publishable_…" autocomplete="off" spellcheck="false">
+      <label class="field-label" for="pairKey">우리 둘의 공유코드</label><input class="od-input" id="pairKey" type="password" placeholder="SQL에 설정한 32자 이상의 코드" autocomplete="off" spellcheck="false"><div class="button-row"><button class="od-button light" type="button" onclick="OD.generateKey()">새 코드 만들기</button><button class="od-button light" type="button" onclick="OD.toggleKey()">코드 보기 / 숨기기</button></div><p>새 코드는 먼저 Supabase 설치 SQL에 등록해야 해요. 코드가 있는 사람은 기록에 접근할 수 있으니 둘만 보관해 주세요.</p>
+      <label class="field-label" for="kakaoKey">Kakao JavaScript 키 (선택)</label><input class="od-input" id="kakaoKey" placeholder="지도와 장소검색을 사용할 때 입력" autocomplete="off" spellcheck="false"><div class="button-row"><button class="od-button" id="saveConnection" type="button" onclick="OD.saveConnection()">연결 설정 저장</button></div><div id="connectionStatus" class="od-status" role="status"></div>
+    </section>
+    <section class="settings-section"><h3>추억을 안전하게 보관하기</h3><p>백업에는 모든 날짜, 장소, 메모와 사진 파일이 들어가요. 연결 키는 들어가지 않아요. 복원은 비어 있는 공간에서만 가능해요.</p><div class="button-row"><button class="od-button" id="backupButton" type="button" onclick="OD.backup()">사진 포함 백업</button><button class="od-button secondary" id="restoreButton" type="button" onclick="document.getElementById('restoreFile').click()">백업 복원</button></div><input class="backup-input" type="file" id="restoreFile" accept=".json,application/json"><button class="od-text-button" id="promoteButton" type="button" onclick="OD.promote()">기기 기록을 빈 공유 서버로 옮기기 ↗</button><div id="backupStatus" class="od-status" role="status"></div><p id="lastBackup"></p></section>
+    <section class="settings-section"><h3>홈 화면에서 만나기</h3><p>Android: Chrome 메뉴 → 홈 화면에 추가 / 앱 설치<br>iPhone: Safari 공유 → 홈 화면에 추가<br>화면이 오래되었다면 앱을 닫았다 다시 열어 주세요.</p><p>Our Date 2.0 · 2026.09<br>실제 일정과 사진은 처음부터 비어 있어요.</p></section>
+  </div>
+</dialog>
+<dialog id="odRecords" class="od-dialog" aria-labelledby="recordsTitle"><div class="dialog-head"><h2 id="recordsTitle">우리의 기록</h2><button class="od-icon-button" type="button" onclick="OD.closeDialog('odRecords')" aria-label="기록 닫기">×</button></div><div class="dialog-body"><input class="od-input search-field" id="recordSearch" type="search" placeholder="날짜, 장소, 메모로 찾아보기" aria-label="전체 기록 검색"><div id="recordSummary" class="search-summary"></div><div id="recordResults"></div></div></dialog>
+<div id="odToast" class="od-toast" role="status" hidden></div>
+<script src="./config.js"></script>
+<script src="./data.js"></script>
+<script src="./app.js"></script>
+<script src="./enhancements.js"></script>
+<script src="./map-css-rotate.js"></script>
+</body>
+</html>
